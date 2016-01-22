@@ -1,4 +1,4 @@
-Plugin = require 'plugin'
+App = require 'app'
 {tr} = require 'i18n'
 
 exports.qToQuestion = (q) ->
@@ -12,7 +12,7 @@ exports.selfRankToText = (nr) ->
 		tr("2nd")
 	else if nr is 3
 		tr("3rd")
-	else if nr is 4 and Plugin.users.count().get() is 4
+	else if nr is 4 and App.users.count().get() is 4
 		tr("4th")
 	else if nr is 4
 		tr("Middle rank")

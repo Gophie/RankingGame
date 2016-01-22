@@ -1,15 +1,14 @@
-Timer = require 'timer'
-Plugin = require 'plugin'
+App = require 'app'
+Comments = require 'comments'
 Db = require 'db'
 Event = require 'event'
+Timer = require 'timer'
 Util = require 'util'
 {tr} = require 'i18n'
 
 questions = Util.questions()
-userCnt = Plugin.userIds().length
+userCnt = App.userIds().length
 topCnt = Math.min(3, userCnt-1)
-
-exports.getTitle = !-> # prevents title input from showing up when adding the plugin
 
 exports.onInstall = exports.onConfig = (config) !->
 	Db.shared.set 'adult', config.adult if config?
@@ -44,7 +43,7 @@ exports.onUpgrade = !->
 		# Restart ranking games that exhausted all questions
 		maxId = Db.shared.get('rounds', 'maxId')
 		lastRoundTime = Db.shared.get('rounds', maxId, 'time')
-		if !Db.shared.get('questionIds') and lastRoundTime > 0 and lastRoundTime < (0|(Date.now()*.001) - 24*60*60)
+		if !Db.shared.get('questionIds') and lastRoundTime > 0 and lastRoundTime < (App.time() - 24*60*60)
 			#newRound()
 			log 'schedule new round restart'
 			Timer.set(Math.floor(Math.random()*6*3600*1000), 'newRound')
@@ -54,7 +53,7 @@ exports.onUpgrade = !->
 	if curId = Db.shared.get('rounds', 'maxId')
 		curRoundTime = Db.shared.get('rounds', curId, 'time')
 		roundDuration = Util.getRoundDuration(curRoundTime)
-		stillDuration = curRoundTime+roundDuration-Plugin.time()
+		stillDuration = curRoundTime+roundDuration-App.time()
 		if stillDuration <= 0
 			newRound()
 		else
@@ -129,10 +128,10 @@ exports.client_newRound = exports.newRound = newRound = (pickedQuestionId) !->
 		maxId = maxId + 1
 		Db.shared.set 'rounds', 'maxId', maxId
 
-		time = 0|(Date.now()*.001)
+		time = 0|App.time()
 		Db.shared.set 'rounds', maxId,
 			qid: newQuestionId
-			by: Plugin.userId()
+			by: App.userId()
 			question: questions[newQuestionId][0]
 			time: time
 
@@ -151,14 +150,14 @@ exports.client_newRound = exports.newRound = newRound = (pickedQuestionId) !->
 exports.reminder = !->
 	roundId = Db.shared.get('rounds', 'maxId')
 	remind = []
-	for userId in Plugin.userIds()
+	for userId in App.userIds()
 		rankings = Db.personal(userId).get 'rankings', roundId
 		if !rankings or !rankings[1]
 			remind.push userId
 
 	if remind.length
 		qId = Db.shared.get 'rounds', roundId, 'qid'
-		time = 0|(Date.now()*.001)
+		time = 0|App.time()
 		minsLeft = (Db.shared.get('next') - time) / 60
 		if minsLeft<60
 			leftText = tr("30 minutes")
@@ -166,19 +165,22 @@ exports.reminder = !->
 			leftText = tr("2 hours")
 
 		if pickedBy = Db.shared.get('rounds', roundId, 'by')
-			pickedByText = tr("Picked by %1, %2 left to vote!", Plugin.userName(pickedBy), leftText)
+			pickedByText = tr("Picked by %1, %2 left to vote!", App.userName(pickedBy), leftText)
 		else
 			pickedByText = tr("%1 left to vote!", leftText)
-		Event.create
+		Comments.post
+			legacyStore: roundId
+			u: pickedBy
+			s: pickedByText
+			path: [roundId]
 			for: remind
-			unit: 'remind'
-			text: Util.qToQuestion(questions[qId][0]) + ' ' + pickedByText
+			pushText: Util.qToQuestion(questions[qId][0]) + ' ' + pickedByText
 
 exports.client_getVoteCnt = (cb) !->
 	voteCnt = 0
 	maxId = Db.shared.get('rounds', 'maxId')
 
-	for userId in Plugin.userIds()
+	for userId in App.userIds()
 		rankings = Db.personal(userId).get 'rankings', maxId
 		if rankings and rankings[1] and rankings[2]
 			voteCnt++
@@ -195,7 +197,7 @@ calcResults = (roundId = false) !->
 	hasVoted = {}
 	voteCnt = 0
 	groupCnt = 0
-	for userId in Plugin.userIds()
+	for userId in App.userIds()
 		# make sure everyone is represented
 		if !scores[userId]?
 			scores[userId] = 0
@@ -278,7 +280,7 @@ calcResults = (roundId = false) !->
 	Db.shared.set 'rounds', roundId, 'results', resultsObj
 
 	# calculate personal score
-	for userId in Plugin.userIds()
+	for userId in App.userIds()
 		self = Db.personal(userId).get 'rankings', roundId, 'self'
 		curScore = Db.shared.get 'competition', userId
 
@@ -305,9 +307,13 @@ calcResults = (roundId = false) !->
 
 	if results.length
 		qid = Db.shared.get('rounds', roundId, 'qid')
-		Event.create
-			unit: 'round'
-			text: Plugin.userName(resultsObj[1]) + ' ' + questions[qid][0] + '!'
+		winnerText = App.userName(resultsObj[1]) + ' ' + questions[qid][0] + '!'
+		Comments.post
+			u: false
+			legacyStore: roundId
+			s: winnerText
+			path: [roundId]
+			pushText: winnerText
 
 exports.client_rankSelf = (roundId, self) !->
 	self = +self
