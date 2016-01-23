@@ -279,9 +279,9 @@ exports.questions = -> [
 	["would be first to move abroad", null]
 	["wears sunglasses indoors to look cool", null]
 	["hates rollercoasters the most", null]
-	["wishes cell phones were never invented", false]
-	["wishes the internet was never invented", false]
-	["cares most about Valentine's Day", false]
+	["wishes cell phones were never invented", null]
+	["wishes the internet was never invented", null]
+	["cares most about Valentine's Day", null]
 	["loves Dinh Phi the most", false]
 		
 	# WARNING: always add new questions to the end of this array
