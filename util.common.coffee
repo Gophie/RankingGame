@@ -283,6 +283,7 @@ exports.questions = -> [
 	["wishes the internet was never invented", null]
 	["cares most about Valentine's Day", null]
 	["loves Dinh Phi the most", false]
+	["who should visit Dinh Phi right now", false]
 		
 	# WARNING: always add new questions to the end of this array
 ]
